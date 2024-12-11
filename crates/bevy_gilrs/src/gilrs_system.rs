@@ -1,6 +1,5 @@
 use crate::{
-    converter::{convert_axis, convert_button},
-    Gilrs, GilrsGamepads,
+    converter::{convert_axis, convert_button}, Gilrs, GilrsGamepads, RawGilrsGamepadAxisChangedEvent, RawGilrsGamepadButtonChangedEvent, RawGilrsGamepadInputEvent
 };
 use bevy_ecs::event::EventWriter;
 use bevy_ecs::prelude::Commands;
@@ -43,6 +42,7 @@ pub fn gilrs_event_system(
     #[cfg(not(target_arch = "wasm32"))] mut gilrs: ResMut<Gilrs>,
     mut gamepads: ResMut<GilrsGamepads>,
     mut events: EventWriter<RawGamepadEvent>,
+    mut raw_gilrs_events: EventWriter<RawGilrsGamepadInputEvent>,
     mut connection_events: EventWriter<GamepadConnectionEvent>,
     mut button_events: EventWriter<RawGamepadButtonChangedEvent>,
     mut axis_event: EventWriter<RawGamepadAxisChangedEvent>,
@@ -82,29 +82,37 @@ pub fn gilrs_event_system(
                 events.send(event.clone().into());
                 connection_events.send(event);
             }
-            EventType::ButtonChanged(gilrs_button, raw_value, _) => {
-                let Some(button) = convert_button(gilrs_button) else {
-                    continue;
-                };
+            EventType::ButtonChanged(gilrs_button, raw_value, code) => {
                 let gamepad = gamepads
                     .id_to_entity
                     .get(&gilrs_event.id)
                     .copied()
                     .expect("mapping should exist from connection");
+
+                let gilrs_axis_event = RawGilrsGamepadButtonChangedEvent::new(gamepad, code.into_u32(), raw_value);
+                raw_gilrs_events.send(RawGilrsGamepadInputEvent::Button(gilrs_axis_event));
+
+                let Some(button) = convert_button(gilrs_button) else {
+                    continue;
+                };
                 events.send(RawGamepadButtonChangedEvent::new(gamepad, button, raw_value).into());
                 button_events.send(RawGamepadButtonChangedEvent::new(
                     gamepad, button, raw_value,
                 ));
             }
-            EventType::AxisChanged(gilrs_axis, raw_value, _) => {
-                let Some(axis) = convert_axis(gilrs_axis) else {
-                    continue;
-                };
+            EventType::AxisChanged(gilrs_axis, raw_value, code) => {
                 let gamepad = gamepads
                     .id_to_entity
                     .get(&gilrs_event.id)
                     .copied()
                     .expect("mapping should exist from connection");
+
+                let gilrs_axis_event = RawGilrsGamepadAxisChangedEvent::new(gamepad, code.into_u32(), raw_value);
+                raw_gilrs_events.send(RawGilrsGamepadInputEvent::Axis(gilrs_axis_event));
+
+                let Some(axis) = convert_axis(gilrs_axis) else {
+                    continue;
+                };                
                 events.send(RawGamepadAxisChangedEvent::new(gamepad, axis, raw_value).into());
                 axis_event.send(RawGamepadAxisChangedEvent::new(gamepad, axis, raw_value));
             }

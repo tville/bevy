@@ -47,6 +47,65 @@ impl GilrsGamepads {
     }
 }
 
+/// Supplied in parallel to the event types managed via bevy-input,
+/// giving the user the option to listen to events directly from gilrs.
+/// Note that the code values are not consistent across platforms.
+#[derive(Event, Debug, Clone, PartialEq)]
+pub enum RawGilrsGamepadInputEvent {
+    /// A button of the gamepad has been triggered.
+    Button(RawGilrsGamepadButtonChangedEvent),
+    /// An axis of the gamepad has been triggered.
+    Axis(RawGilrsGamepadAxisChangedEvent),
+}
+
+/// Change event with the gilrs-specific button code, which is not
+/// consistent across platforms.
+#[derive(Event, Debug, Copy, Clone, PartialEq)]
+pub struct RawGilrsGamepadButtonChangedEvent {
+    /// The gamepad on which the button is triggered.
+    pub gamepad: Entity,
+    /// The gilrs code of the triggered button.
+    pub button_code: u32,
+    /// The value of the button.
+    pub value: f32,
+}
+
+impl RawGilrsGamepadButtonChangedEvent {
+    /// Creates a [`RawGilrsGamepadButtonChangedEvent`].
+    pub fn new(gamepad: Entity, button_code: u32, value: f32) -> Self {
+        Self {
+            gamepad,
+            button_code,
+            value,
+        }
+    }
+}
+
+
+/// Change event with the gilrs-specific axis code, which is not
+/// consistent across platforms.
+#[derive(Event, Debug, Copy, Clone, PartialEq)]
+pub struct RawGilrsGamepadAxisChangedEvent {
+    /// The gamepad on which the axis is triggered.
+    pub gamepad: Entity,
+    /// The type of the triggered axis.
+    pub axis_code: u32,
+    /// The value of the axis.
+    pub value: f32,
+}
+
+impl RawGilrsGamepadAxisChangedEvent {
+    /// Creates a [`RawGamepadAxisChangedEvent`].
+    pub fn new(gamepad: Entity, axis_code: u32, value: f32) -> Self {
+        Self {
+            gamepad,
+            axis_code,
+            value,
+        }
+    }
+}
+
+
 /// Plugin that provides gamepad handling to an [`App`].
 #[derive(Default)]
 pub struct GilrsPlugin;
@@ -68,6 +127,7 @@ impl Plugin for GilrsPlugin {
                 #[cfg(not(target_arch = "wasm32"))]
                 app.insert_resource(Gilrs(SyncCell::new(gilrs)));
                 app.init_resource::<GilrsGamepads>();
+                app.add_event::<RawGilrsGamepadInputEvent>();
                 app.init_resource::<RunningRumbleEffects>()
                     .add_systems(PreStartup, gilrs_event_startup_system)
                     .add_systems(PreUpdate, gilrs_event_system.before(InputSystem))
